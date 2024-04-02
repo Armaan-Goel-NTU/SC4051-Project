@@ -60,12 +60,12 @@ struct ResponseManager {
 impl ResponseManager {
     fn flush_client(&mut self, addr: &SocketAddr) {
         if self.response_map.contains_key(addr) {
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing response entires of {addr}");
+            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing response entires of this client");
             self.response_map.remove(addr);
         }
 
         if self.session_map.contains_key(addr) {
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing session entry of {addr}");
+            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing session entry of this client");
             self.session_map.remove(addr);
         }
     }
@@ -92,7 +92,7 @@ impl ResponseManager {
             status = "BAD";
         }
         println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Response has status code {status} with data '{data}'");
-        println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Saving response of req no. {req_no} from {addr}");
+        println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Saving response of req no. {req_no} from this client");
         if self.response_map.contains_key(addr) {
             let req_map = self.response_map.get_mut(addr).unwrap();
             req_map.insert(req_no, response);
@@ -216,7 +216,7 @@ impl<'a> ClientUnmarshal<'a> {
         match op {
             RequestOperation::READ |  RequestOperation::INSERT | RequestOperation::DELETE | RequestOperation::UPDATE | RequestOperation::MONITOR => {},
             _ => {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} requested for an invalid operation");
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client requested for an invalid operation");
                 response.data = "Invalid Operation".to_owned();
                 return response;
             },
@@ -259,8 +259,10 @@ impl<'a> ClientUnmarshal<'a> {
         if op == RequestOperation::INSERT || op == RequestOperation::UPDATE {
             let data = self.read_string();
             if op == RequestOperation::UPDATE  {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} wants to overwrite '{data}' starting from the offset");
-                if (offset + data.len() as u32) as u64 > len {
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to overwrite '{data}' starting from the offset");
+                let data_len = data.len();
+                if (offset + data_len as u32) as u64 > len {
+                    println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {offset} + length of data ({data_len}) exceeds the file size ({len})");
                     response.data = "Offset+Data is too large".to_owned();
                     return response;
                 }
@@ -268,7 +270,7 @@ impl<'a> ClientUnmarshal<'a> {
                 let _ = file.write_all(data.as_bytes());
                 monitor_manager.inform_monitors(path, read_file(&mut file));
             } else {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} wants to insert '{data}' at the offset");
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to insert '{data}' at the offset");
                 let mut buf = Vec::new();
                 let _ = file.read_to_end(&mut buf);
                 let _ = file.seek(SeekFrom::Start(offset as u64));
@@ -279,17 +281,17 @@ impl<'a> ClientUnmarshal<'a> {
         } else if op == RequestOperation::READ || op == RequestOperation::DELETE {
             let amount: u32 = self.read_int();
             if (offset + amount) as u64 > len {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {offset} + {amount} exceeds the file size");
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {offset} + {amount} exceeds the file size ({len})");
                 response.data = "Offset+Amount is too large".to_owned();
                 return response;
             } 
             if op == RequestOperation::READ {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} wants to read {amount} bytes starting from the offset");
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to read {amount} bytes starting from the offset");
                 let mut buf = vec![0u8; amount as usize];
                 let _ = file.read_exact(&mut buf);
                 response.data = str::from_utf8(&buf).unwrap().to_owned();
             } else {
-                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} wants to delete {amount} bytes starting from the offset");
+                println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to delete {amount} bytes starting from the offset");
                 let mut buf = Vec::new();
                 let _ = file.seek(SeekFrom::Start((offset + amount) as u64));
                 let _ = file.read_to_end(&mut buf);
@@ -300,7 +302,7 @@ impl<'a> ClientUnmarshal<'a> {
             }
         } else {
             let interval: u32 = self.read_int();
-            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} has requested to monitor {path_str} for {interval}ms");
+            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client has requested to monitor {path_str} for {interval}ms");
             monitor_manager.add_interval(path, addr, interval)
         }
 
@@ -313,17 +315,17 @@ impl<'a> ClientUnmarshal<'a> {
         let op: u8 = self.read_byte();
 
         if op == RequestOperation::HANDSHAKE {
-            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} initiated handshake");
+            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client initiated handshake");
             let client_time = self.read_int();
             if response_manager.session_map.contains_key(&addr) {
                 println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Found key for {client_time}");
                 if response_manager.session_map.get(&addr).unwrap() != &client_time {
-                    println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing old responses from {addr}. Previous session was {client_time}");
+                    println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Clearing old responses from this client. Previous session was {client_time}");
                     response_manager.flush_client(&addr);
                     response_manager.session_map.insert(addr, client_time);
                 }
             } else {
-                println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Creating blank response map for {addr}. Session id is {client_time}");
+                println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Creating blank response map for this client. Session id is {client_time}");
                 response_manager.session_map.insert(addr, client_time);
             }
             println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Sending handshake confirmation");
@@ -331,17 +333,17 @@ impl<'a> ClientUnmarshal<'a> {
         }
 
         if op == RequestOperation::DISCONNECT {
-            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} {addr} wants to disconnect");
+            println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to disconnect");
             response_manager.flush_client(&addr);
             println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Sending disconnect confirmation");
             return ServerMarshal{status: StatusCode::GOOD, data: "Bye!".to_owned()};
         }
 
         if response_manager.has_entry(&addr, req_no) { 
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Req No. {req_no} from {addr} is a duplicate! Sending back saved response.");
+            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Req No. {req_no} from client is a duplicate! Sending back saved response.");
             return response_manager.get_entry(&addr, req_no).clone(); 
-        } else {
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} No saved response found for req no. {req_no} from {addr}");
+        } else if response_manager.at_most_once {
+            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} No saved response found for req no. {req_no} from client");
         }
         let response = self.parse_request(op, dir, monitor_manager, addr);
         response_manager.add_entry(&addr, req_no, response.clone());
