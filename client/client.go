@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"strconv"
-	"time"
 )
 
 var (
@@ -15,23 +13,21 @@ var (
     c_port int
     host string
     t int
+	c_addr string = "127.0.0.1"
+	retries int
+	timeout int
 )
 
-func checkError(err error) {
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
-}
-
-func readInt(prompt string) int {
-	var choice int
+func readInt(prompt string) uint32 {
+	var choice uint32
+	var choice64 uint64
 	var err error = fmt.Errorf("")
 	for err != nil {
 		fmt.Print(prompt)
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
-		choice, err = strconv.Atoi(input[:len(input)-1])
+		choice64, err = strconv.ParseUint(input[:len(input)-1], 10, 32)
+		choice = uint32(choice64)
 	}
 	return choice
 }
@@ -46,8 +42,9 @@ func readString(prompt string) string {
 	return input[:len(input)-1]
 }
 
-func displayMenu() int {
-    fmt.Println("Menu:")
+func displayMenu() uint32 {
+	fmt.Println()
+    fmt.Println(color(White,"Menu:"))
 	fmt.Println("1. Read")
 	fmt.Println("2. Insert")
 	fmt.Println("3. Update")
@@ -61,82 +58,37 @@ func main() {
     flag.StringVar(&host, "host", "127.0.0.1", "server host")
     flag.IntVar(&s_port, "s_port", 45600, "server port")
     flag.IntVar(&c_port, "c_port", 45601, "client port")
-    flag.IntVar(&t, "t", 3, "freshness interval")
-	flag.Parse();
+    flag.IntVar(&t, "t", 10000, "freshness interval")
+	flag.IntVar(&retries, "retries", 3, "number of request retries")
+	flag.IntVar(&timeout, "timeout", 3000, "response timeout")
+	flag.Parse()
 
-    server_address := host + ":" + strconv.Itoa(s_port);
-    client_address := "127.0.0.1:" + strconv.Itoa(c_port);
+	fmt.Printf("%s Server address is %s:%d\n", color(Yellow,"[Client]:"), host, s_port)
+	fmt.Printf("%s Client address is %s:%d\n", color(Yellow,"[Client]:"), c_addr, c_port)
+	fmt.Printf("%s Freshness interval is %dms\n", color(Yellow,"[Client]:"), t)
+	fmt.Printf("%s Max retries is %d\n", color(Yellow,"[Client]:"), retries)
+	fmt.Printf("%s Timeout is %dms\n", color(Yellow,"[Client]:"), timeout)
 
-    s_udpAddr, err := net.ResolveUDPAddr("udp4", server_address)
-    checkError(err);
-
-    c_udpAddr, err := net.ResolveUDPAddr("udp4", client_address)
-    checkError(err);
-    
-    c, err := net.DialUDP("udp4", c_udpAddr, s_udpAddr)
-    checkError(err);
+	ConnectToServer()
+	cache_manager = CacheManager{cacheMap: make(map[string][]CacheEntry)}
 
     for {
 		choice := displayMenu()
 		switch choice {
-		case 1:
-			req := Request(Read)
-			req.AddStringInput("File Path: ")
-			req.AddIntInput("Offset: ")
-			req.AddIntInput("Amount: ")
-			Send(c, req)
-		case 2:
-			req := Request(Insert)
-			req.AddStringInput("File Path: ")
-			req.AddIntInput("Offset: ")
-			req.AddStringInput("Data: ")
-			Send(c, req)
-		case 3:
-			req := Request(Update)
-			req.AddStringInput("File Path: ")
-			req.AddIntInput("Offset: ")
-			req.AddStringInput("Data: ")
-			Send(c, req)
-		case 4:
-			req := Request(Delete)
-			req.AddStringInput("File Path: ")
-			req.AddIntInput("Offset: ")
-			req.AddIntInput("Amount: ")
-			Send(c, req)
-		case 5:
-			req := Request(Monitor)
-			req.AddStringInput("File Path: ")
-			interval := readInt("Interval (ms): ")
-			req.AddInt(interval)
-			Send(c, req)
-			for {
-				buf := make([]byte, 1024)
-				c.SetReadDeadline(time.Now().Add(time.Duration(interval) * time.Millisecond))
-				amt, err := c.Read(buf)
-				if err != nil {
-					if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-						fmt.Println("Monitor interval has passed!")
-						break
-					}
-					fmt.Println("Error reading:", err)
-					continue
-				} else {
-					fmt.Printf("Read %d bytes\n", amt)
-					response := Response(buf)
-					if response.status == Bad {
-						fmt.Println("Error")
-					} else {
-						fmt.Println("File Changed!")
-					}
-					fmt.Println(response.data)
-				}
-			}
-		case 6:
-            fmt.Println("Exiting…")
-            c.Close();
-			os.Exit(0)
-		default:
-			fmt.Println("Invalid choice. Please choose a number between 1 and 5.")
+			case 1:
+				ReadBytes()
+			case 2:
+				InsertBytes()
+			case 3:
+				UpdateBytes()
+			case 4:
+				DeleteBytes()
+			case 5:
+				MonitorChanges()
+			case 6:
+				DisconnectFromServer()
+			default:
+				fmt.Println("Invalid choice. Please choose a number between 1 and 6.")
 		}
 	}
 }
