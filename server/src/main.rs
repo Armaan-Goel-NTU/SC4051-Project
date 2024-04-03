@@ -45,16 +45,9 @@ struct MonitorInterval {
     end_time: u128
 }
 
-fn get_time() -> u128 {
-    let start = SystemTime::now();
-    let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
-    return since_the_epoch.as_millis();
-}
-
 struct ResponseManager {
-    response_map: HashMap<SocketAddr, HashMap<u32, ServerMarshal>>,
+    response_map: HashMap<SocketAddr, HashMap<u32, ResponseMarshal>>,
     session_map: HashMap<SocketAddr, u32>,
-    at_most_once: bool
 }
 
 impl ResponseManager {
@@ -71,7 +64,6 @@ impl ResponseManager {
     }
 
     fn has_entry(&self, addr: &SocketAddr, req_no: u32) -> bool {
-        if !self.at_most_once { return false }
         if self.response_map.contains_key(addr) {
             let req_map = self.response_map.get(addr).unwrap();
             return req_map.contains_key(&req_no);
@@ -79,13 +71,12 @@ impl ResponseManager {
         return false
     }
 
-    fn get_entry(&self, addr: &SocketAddr, req_no: u32) -> &ServerMarshal {
+    fn get_entry(&self, addr: &SocketAddr, req_no: u32) -> &ResponseMarshal {
         let req_map = self.response_map.get(addr).unwrap();
         return req_map.get(&req_no).unwrap();
     }
 
-    fn add_entry(&mut self, addr: &SocketAddr, req_no: u32, response: ServerMarshal) {
-        if !self.at_most_once { return }
+    fn add_entry(&mut self, addr: &SocketAddr, req_no: u32, response: ResponseMarshal) {
         let data = &response.data;
         let mut status = "GOOD";
         if response.status == StatusCode::BAD {
@@ -110,8 +101,14 @@ struct MonitorManager<'a> {
 }
 
 impl<'a> MonitorManager<'a> {
+    fn get_time(&self) -> u128 {
+        let start = SystemTime::now();
+        let since_the_epoch = start.duration_since(UNIX_EPOCH).unwrap();
+        return since_the_epoch.as_millis();
+    }
+    
     fn add_interval(&mut self, file: PathBuf, addr: SocketAddr, interval: u32) {
-        let current_time = get_time();
+        let current_time = self.get_time();
         let end_time = current_time + interval as u128;
         let file_str = file.to_string_lossy();
         println!("{style_bold}{color_cyan}[MonitorManager]:{style_reset} Adding monitor on {file_str} for {addr}, ending at {end_time} ({current_time} + {interval}");
@@ -126,11 +123,11 @@ impl<'a> MonitorManager<'a> {
     }
 
     fn inform_monitors(&mut self, file: PathBuf, content: Vec<u8>) {
-        let time : u128 = get_time();
-        println!("{style_bold}{color_cyan}[MonitorManager]:{style_reset} Current time is {time}");
+        let time : u128 = self.get_time();
         let file_str = file.to_string_lossy();
+        println!("{style_bold}{color_cyan}[MonitorManager]:{style_reset} Checking if any clients must be informed about changes on {file_str}. Current time is {time}");
         if self.dict.contains_key(&file) {
-            let response = ServerMarshal{status: StatusCode::GOOD, data: str::from_utf8(&content).unwrap().to_string()};
+            let response = ResponseMarshal{status: StatusCode::GOOD, data: str::from_utf8(&content).unwrap().to_string()};
             let set = self.dict.get_mut(&file).unwrap();
             let set_clone = set.clone();
             for element in set_clone.iter() {
@@ -157,12 +154,12 @@ impl StatusCode {
 }
 
 #[derive(Clone)]
-struct ServerMarshal {
+struct ResponseMarshal {
     status: u8,
     data: String
 }
 
-impl ServerMarshal {
+impl ResponseMarshal {
     fn into_bytes(&self) -> Vec<u8> {
         let mut buf : Vec<u8> = Vec::new();
         buf.push(self.status);
@@ -171,19 +168,19 @@ impl ServerMarshal {
     }
 }
 
-struct ClientUnmarshal<'a> {
+struct RequestHandler<'a> {
     buf: &'a [u8],
     i: u32
 }
 
-fn read_file(file: &mut File) -> Vec<u8> {
-    let mut buf = Vec::new();
-    let _ = file.seek(SeekFrom::Start(0));
-    let _ = file.read_to_end(&mut buf);
-    return buf;
-}
-
-impl<'a> ClientUnmarshal<'a> {
+impl<'a> RequestHandler<'a> {
+    fn read_file(&self, file: &mut File) -> Vec<u8> {
+        let mut buf = Vec::new();
+        let _ = file.seek(SeekFrom::Start(0));
+        let _ = file.read_to_end(&mut buf);
+        return buf;
+    }
+    
     fn read_int(&mut self) -> u32 {
         let mut c : u32 = self.buf[(self.i+3) as usize] as u32;
         c += (self.buf[(self.i+2) as usize] as u32) << 8;
@@ -210,8 +207,8 @@ impl<'a> ClientUnmarshal<'a> {
         return c;
     }
 
-    fn parse_request(&mut self, op: u8, dir: &PathBuf, monitor_manager: &mut MonitorManager, addr: SocketAddr) -> ServerMarshal {
-        let mut response =  ServerMarshal{status: StatusCode::BAD, data: "Operation Completed".to_owned()};
+    fn parse_request(&mut self, op: u8, dir: &PathBuf, monitor_manager: &mut MonitorManager, addr: SocketAddr) -> ResponseMarshal {
+        let mut response =  ResponseMarshal{status: StatusCode::BAD, data: "Operation Completed".to_owned()};
 
         match op {
             RequestOperation::READ |  RequestOperation::INSERT | RequestOperation::DELETE | RequestOperation::UPDATE | RequestOperation::MONITOR => {},
@@ -268,7 +265,7 @@ impl<'a> ClientUnmarshal<'a> {
                 }
                 let _ = file.seek(SeekFrom::Start(offset as u64));
                 let _ = file.write_all(data.as_bytes());
-                monitor_manager.inform_monitors(path, read_file(&mut file));
+                monitor_manager.inform_monitors(path, self.read_file(&mut file));
             } else {
                 println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to insert '{data}' at the offset");
                 let mut buf = Vec::new();
@@ -276,7 +273,7 @@ impl<'a> ClientUnmarshal<'a> {
                 let _ = file.seek(SeekFrom::Start(offset as u64));
                 let _ = file.write_all(data.as_bytes());
                 let _ = file.write_all(&buf);
-                monitor_manager.inform_monitors(path, read_file(&mut file));
+                monitor_manager.inform_monitors(path, self.read_file(&mut file));
             }
         } else if op == RequestOperation::READ || op == RequestOperation::DELETE {
             let amount: u32 = self.read_int();
@@ -298,7 +295,7 @@ impl<'a> ClientUnmarshal<'a> {
                 let _ = file.seek(SeekFrom::Start(offset as u64));
                 let _ = file.write_all(&buf);
                 let _ = file.set_len( len - amount as u64);
-                monitor_manager.inform_monitors(path, read_file(&mut file));
+                monitor_manager.inform_monitors(path, self.read_file(&mut file));
             }
         } else {
             let interval: u32 = self.read_int();
@@ -310,7 +307,7 @@ impl<'a> ClientUnmarshal<'a> {
         return response;
     }
 
-    fn process_request(&mut self, dir: &PathBuf, monitor_manager: &mut MonitorManager, addr: SocketAddr, response_manager: &mut ResponseManager) -> ServerMarshal {
+    fn process_request(&mut self, dir: &PathBuf, monitor_manager: &mut MonitorManager, addr: SocketAddr, response_manager: &mut ResponseManager, at_most_once: bool) -> ResponseMarshal {
         let req_no = self.read_int();
         let op: u8 = self.read_byte();
 
@@ -329,31 +326,39 @@ impl<'a> ClientUnmarshal<'a> {
                 response_manager.session_map.insert(addr, client_time);
             }
             println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Sending handshake confirmation");
-            return ServerMarshal{status: StatusCode::GOOD, data: "Handshake Completed. Welcome!".to_owned()};
+            return ResponseMarshal{status: StatusCode::GOOD, data: "Handshake Completed. Welcome!".to_owned()};
         }
 
         if op == RequestOperation::DISCONNECT {
             println!("{style_bold}{color_magenta}[RequestHandler]:{style_reset} client wants to disconnect");
             response_manager.flush_client(&addr);
             println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Sending disconnect confirmation");
-            return ServerMarshal{status: StatusCode::GOOD, data: "Bye!".to_owned()};
+            return ResponseMarshal{status: StatusCode::GOOD, data: "Bye!".to_owned()};
         }
 
-        if response_manager.has_entry(&addr, req_no) { 
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Req No. {req_no} from client is a duplicate! Sending back saved response.");
-            return response_manager.get_entry(&addr, req_no).clone(); 
-        } else if response_manager.at_most_once {
-            println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} No saved response found for req no. {req_no} from client");
+        if at_most_once {
+            if response_manager.has_entry(&addr, req_no) {
+                println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Req No. {req_no} from client is a duplicate! Sending back saved response.");
+                return response_manager.get_entry(&addr, req_no).clone(); 
+            } else {
+                println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} No saved response found for req no. {req_no} from client");
+            }
         }
+
         let response = self.parse_request(op, dir, monitor_manager, addr);
-        response_manager.add_entry(&addr, req_no, response.clone());
 
+        if at_most_once {
+            response_manager.add_entry(&addr, req_no, response.clone());
+        }
+
+        let response_data = &response.data;
+        println!("{style_bold}{color_blue}[ResponseManager]:{style_reset} Sending data '{response_data}'");
         return response;
         
     }
 }
 
-fn send(socket: &UdpSocket, response: &ServerMarshal, addr: SocketAddr) {
+fn send(socket: &UdpSocket, response: &ResponseMarshal, addr: SocketAddr) {
     let result = socket.send_to(&response.into_bytes(), addr);
     if result.is_ok() {
         let amt = result.unwrap();
@@ -396,7 +401,7 @@ fn main() {
     }
 
     let mut monitor_manager: MonitorManager<'_> = MonitorManager{dict: HashMap::new(), socket: &socket};
-    let mut response_manager: ResponseManager = ResponseManager{response_map: HashMap::new(), session_map: HashMap::new(), at_most_once: args.at_most_once};
+    let mut response_manager: ResponseManager = ResponseManager{response_map: HashMap::new(), session_map: HashMap::new()};
 
     loop {
         let mut buf: [u8; 1048576] = [0; 1024*1024];
@@ -404,8 +409,8 @@ fn main() {
         if result.is_ok() {
             let (amt, src) = result.unwrap();
             println!("{style_bold}\n{color_green}[UDP]:{style_reset} Received {amt} bytes from {src}");
-            let mut handler : ClientUnmarshal = ClientUnmarshal{buf: &buf, i: 0};
-            let response = handler.process_request(&path, &mut monitor_manager, src, &mut response_manager);
+            let mut handler : RequestHandler = RequestHandler{buf: &buf, i: 0};
+            let response = handler.process_request(&path, &mut monitor_manager, src, &mut response_manager, args.at_most_once);
             send(&socket, &response, src);
         } else {
             let err: Error = result.unwrap_err();

@@ -13,7 +13,7 @@ var (
 )
 
 func printError(err string) {
-	fmt.Printf("%s %s\n", color(Red,"[Error]:"), err)
+	fmt.Printf("%s %s\n", header(Error), err)
 }
 
 func checkError(err error) {
@@ -24,7 +24,7 @@ func checkError(err error) {
 }
 
 func exit() {
-	fmt.Printf("%s Closing connection and exiting\n", color(Yellow,"[Client]:"))
+	fmt.Printf("%s Closing connection and exiting\n", header(ClientHeader))
 	conn.Close()
 	os.Exit(0)
 }
@@ -43,7 +43,7 @@ func ConnectToServer() {
     checkError(err)
 	
 	session_id := uint32(time.Now().Unix())
-    fmt.Printf("\n%s Attempting to handshake with the server with session id %d\n", color(Yellow,"[Client]:"), session_id)
+    fmt.Printf("\n%s Attempting to handshake with the server with session id %d\n", header(ClientHeader), session_id)
 	handshake := Request(Handshake)
 	handshake.AddInt(session_id)
 	success, _ := Send(handshake)
@@ -51,14 +51,14 @@ func ConnectToServer() {
 }
 
 func DisconnectFromServer() {
-	fmt.Printf("\n%s Sending disconnect notice\n", color(Yellow,"[Client]:"))
+	fmt.Printf("\n%s Sending disconnect notice\n", header(ClientHeader))
 	req := Request(Disconnect)
 	Send(req)
 	exit()
 }
 
 func WaitForUpdates(wait_until time.Time, path string) {
-	fmt.Printf("%s Entering Monitor Mode\n", color(Cyan, "[Monitor]:"))
+	fmt.Printf("%s Entering Monitor Mode\n", header(MonitorHeader))
 	for {
 		buf := make([]byte, 1024)
 		conn.SetReadDeadline(wait_until)
@@ -66,19 +66,19 @@ func WaitForUpdates(wait_until time.Time, path string) {
 		amt, err := conn.Read(buf)
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				fmt.Printf("%s Monitor interval has passed! Interval ended at %d. Time now is %d\n", color(Cyan, "[Monitor]:"), wait_until.UnixMilli(), time.Now().UnixMilli())
+				fmt.Printf("%s Monitor interval has passed! Interval ended at %d. Time now is %d\n", header(MonitorHeader), wait_until.UnixMilli(), time.Now().UnixMilli())
 				break
 			}
 			printError(err.Error())
 			continue
 		} else {
-			fmt.Printf("%s Received %d bytes\n", color(Blue, "[UDP]:"), amt)
+			fmt.Printf("%s Received %d bytes\n", header(UDPHeader), amt)
 			response := Response(buf, amt)
-			col := color(Green, "[Server]:")
+			col := header(ServerGood)
 			if response.status == Bad {
-				col = color(Red, "[Server]:")
+				col = header(ServerBad)
 			} else {
-				fmt.Printf("%s File Changed!\n",  color(Cyan, "[Monitor]:"))
+				fmt.Printf("%s File Changed!\n",  header(MonitorHeader))
 				if time.Until(wait_until).Milliseconds() < int64(t) {
 					cache_manager.AddEntry(path, 0, response.data)
 				}
@@ -88,20 +88,25 @@ func WaitForUpdates(wait_until time.Time, path string) {
 	}
 }
 
-func Send(req *ClientMarshal) (bool, string) {
+func CheckAttempts(attempts int) int {
+	if attempts > 0 {
+		attempts--
+		fmt.Printf("%s Retrying! %d attempts left\n", header(ClientHeader) ,attempts)
+	} else {
+		printError("Operation Failed. Reached max retries (" + strconv.Itoa(retries) + ")")
+	}
+	return attempts
+}
+
+func Send(req *RequestMarshal) (bool, string) {
 	attempts := retries
 	for attempts > 0 {
 		_, err := conn.Write(req.buf)
-		fmt.Printf("%s Sent %d bytes\n", color(Blue, "[UDP]:"), len(req.buf))
+		fmt.Printf("%s Sent %d bytes\n", header(UDPHeader), len(req.buf))
 		if err != nil {
 			printError(err.Error())
-			if attempts > 0 {
-				attempts--
-				fmt.Printf("%s Retrying! %d attempts left\n", color(Yellow, "[Client]:") ,attempts)
-			} else {
-				printError("Operation Failed. Reached max retries (" + strconv.Itoa(retries) + ")")
-				break
-			}
+			attempts = CheckAttempts(attempts)
+			if attempts == 0 { break }
 			continue
 		}
 		p :=  make([]byte, 1024 * 1024)
@@ -113,19 +118,14 @@ func Send(req *ClientMarshal) (bool, string) {
 			} else {
 				printError(err.Error())
 			}
-			if attempts > 0 {
-				attempts--
-				fmt.Printf("%s Retrying! %d attempts left\n", color(Yellow, "[Client]:") ,attempts)
-			} else {
-				printError("Operation Failed. Reached max retries (" + strconv.Itoa(retries) + ")")
-				break
-			}
+			attempts = CheckAttempts(attempts)
+			if attempts == 0 { break }
 		} else {
-			fmt.Printf("%s Received %d bytes\n", color(Blue, "[UDP]:"), amt)
+			fmt.Printf("%s Received %d bytes\n", header(UDPHeader), amt)
 			response := Response(p, amt)
-			col := color(Green, "[Server]:")
+			col := header(ServerGood)
 			if response.status == Bad {
-				col = color(Red, "[Server]:")
+				col = header(ServerBad)
 			}
 			fmt.Printf("%s %s\n", col, response.data)
 			return response.status == Good, response.data

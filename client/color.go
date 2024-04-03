@@ -11,6 +11,36 @@ const (
     White   = "\033[1;37m"
 )
 
-func color(col string, text string) string {
-    return col + text + Reset
+const (
+    ClientHeader = iota
+    MonitorHeader
+    ServerGood
+    ServerBad
+    CacheHeader 
+    Menu
+    UDPHeader
+    Error  
+)
+
+func header(i int) string {
+    switch i {
+        case ClientHeader:
+            return Yellow + "[Client]:" + Reset
+        case MonitorHeader:
+            return Cyan + "[Monitor]:" + Reset
+        case ServerGood:
+            return Green + "[Server]:" + Reset
+        case ServerBad:
+            return Red + "[Server]:" + Reset
+        case CacheHeader:
+            return Magenta + "[CacheManager]:" + Reset
+        case Menu:
+            return White + "Menu" + Reset
+        case UDPHeader:
+            return Blue + "[UDP]:" + Reset
+        case Error:
+            return Red + "[Error]:" + Reset
+        default:
+            return White + "[Unknown]:" + Reset
+    }
 }

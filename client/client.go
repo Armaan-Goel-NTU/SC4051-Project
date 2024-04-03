@@ -44,7 +44,7 @@ func readString(prompt string) string {
 
 func displayMenu() uint32 {
 	fmt.Println()
-    fmt.Println(color(White,"Menu:"))
+    fmt.Println(header(Menu))
 	fmt.Println("1. Read")
 	fmt.Println("2. Insert")
 	fmt.Println("3. Update")
@@ -63,11 +63,11 @@ func main() {
 	flag.IntVar(&timeout, "timeout", 3000, "response timeout")
 	flag.Parse()
 
-	fmt.Printf("%s Server address is %s:%d\n", color(Yellow,"[Client]:"), host, s_port)
-	fmt.Printf("%s Client address is %s:%d\n", color(Yellow,"[Client]:"), c_addr, c_port)
-	fmt.Printf("%s Freshness interval is %dms\n", color(Yellow,"[Client]:"), t)
-	fmt.Printf("%s Max retries is %d\n", color(Yellow,"[Client]:"), retries)
-	fmt.Printf("%s Timeout is %dms\n", color(Yellow,"[Client]:"), timeout)
+	fmt.Printf("%s Server address is %s:%d\n", header(ClientHeader), host, s_port)
+	fmt.Printf("%s Client address is %s:%d\n", header(ClientHeader), c_addr, c_port)
+	fmt.Printf("%s Freshness interval is %dms\n", header(ClientHeader), t)
+	fmt.Printf("%s Max retries is %d\n", header(ClientHeader), retries)
+	fmt.Printf("%s Timeout is %dms\n", header(ClientHeader), timeout)
 
 	ConnectToServer()
 	cache_manager = CacheManager{cacheMap: make(map[string][]CacheEntry)}
@@ -76,15 +76,15 @@ func main() {
 		choice := displayMenu()
 		switch choice {
 			case 1:
-				ReadBytes()
+				ReadService()
 			case 2:
-				InsertBytes()
+				InsertService()
 			case 3:
-				UpdateBytes()
+				UpdateService()
 			case 4:
-				DeleteBytes()
+				DeleteService()
 			case 5:
-				MonitorChanges()
+				MonitorService()
 			case 6:
 				DisconnectFromServer()
 			default:

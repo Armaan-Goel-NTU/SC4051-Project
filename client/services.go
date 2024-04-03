@@ -9,7 +9,7 @@ var (
 	cache_manager CacheManager
 )
 
-func ReadBytes() {
+func ReadService() {
 	path := readString("File Path: ")
 	offset := readInt("Offset: ")
 	amount := readInt("Amount: ")
@@ -17,7 +17,7 @@ func ReadBytes() {
 
 	has_entry, entry := cache_manager.GetEntry(path, offset, amount)
 	if has_entry {
-		fmt.Printf("%s %s\n", color(Yellow,"[Client]:"), entry)
+		fmt.Printf("%s %s\n", header(ClientHeader), entry)
 	} else {
 		req := Request(Read)
 		req.AddString(path)
@@ -25,7 +25,7 @@ func ReadBytes() {
 		req.AddInt(amount)
 		
 		req.PrintNumber()
-		fmt.Printf("%s Sending request to read %d bytes starting at offset %d in %s\n", color(Yellow,"[Client]:"), amount, offset, path)
+		fmt.Printf("%s Sending request to read %d bytes starting at offset %d in %s\n", header(ClientHeader), amount, offset, path)
 		success, data := Send(req)
 		if success {
 			cache_manager.AddEntry(path, offset, data)
@@ -33,7 +33,7 @@ func ReadBytes() {
 	}
 }
 
-func InsertBytes() {
+func InsertService() {
 	req := Request(Insert)
 	path := req.AddStringInput("File Path: ")
 	offset := req.AddIntInput("Offset: ")
@@ -41,11 +41,11 @@ func InsertBytes() {
 	
 	fmt.Println()
 	req.PrintNumber()
-	fmt.Printf("%s Sending request to insert given data of length %d at offset %d in %s\n", color(Yellow,"[Client]:"), len(data), offset, path)
+	fmt.Printf("%s Sending request to insert given data of length %d at offset %d in %s\n", header(ClientHeader), len(data), offset, path)
 	Send(req)
 }
 
-func UpdateBytes() {
+func UpdateService() {
 	req := Request(Update)
 	path := req.AddStringInput("File Path: ")
 	offset := req.AddIntInput("Offset: ")
@@ -53,11 +53,11 @@ func UpdateBytes() {
 	
 	fmt.Println()
 	req.PrintNumber()
-	fmt.Printf("%s Sending request to update given data of length %d at offset %d in %s\n", color(Yellow,"[Client]:"), len(data), offset, path)
+	fmt.Printf("%s Sending request to update given data of length %d at offset %d in %s\n", header(ClientHeader), len(data), offset, path)
 	Send(req)
 }
 
-func DeleteBytes() {
+func DeleteService() {
 	req := Request(Delete)
 	path := req.AddStringInput("File Path: ")
 	offset := req.AddIntInput("Offset: ")
@@ -65,18 +65,18 @@ func DeleteBytes() {
 	
 	fmt.Println()
 	req.PrintNumber()
-	fmt.Printf("%s Sending request to delete %d bytes starting at offset %d in %s\n", color(Yellow,"[Client]:"), amount, offset, path)
+	fmt.Printf("%s Sending request to delete %d bytes starting at offset %d in %s\n", header(ClientHeader), amount, offset, path)
 	Send(req)
 }
 
-func MonitorChanges() {
+func MonitorService() {
 	req := Request(Monitor)
 	path := req.AddStringInput("File Path: ")
 	interval := req.AddIntInput("Interval (ms): ")
 	
 	fmt.Println()
 	req.PrintNumber()
-	fmt.Printf("%s Sending request to monitor any updates to %s for the next %dms\n", color(Yellow,"[Client]:"), path, interval)
+	fmt.Printf("%s Sending request to monitor any updates to %s for the next %dms\n", header(ClientHeader), path, interval)
 	success, _ := Send(req)
 	
 	if success {
