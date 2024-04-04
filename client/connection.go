@@ -39,8 +39,8 @@ func exit() {
 // Function used to initially connect to the server
 func ConnectToServer() {
 	// define addresses. client is also bound to a specific port
-	server_address := host + ":" + strconv.Itoa(s_port);
-    client_address := c_addr + ":" + strconv.Itoa(c_port);
+	server_address := s_host + ":" + strconv.Itoa(s_port);
+    client_address := c_host + ":" + strconv.Itoa(c_port);
 
 	// resolve the constructed addresses
     s_udpAddr, err := net.ResolveUDPAddr("udp4", server_address)

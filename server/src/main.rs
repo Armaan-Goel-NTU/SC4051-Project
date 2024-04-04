@@ -16,6 +16,10 @@ use inline_colorization::*;
 #[derive(Parser, Debug)]
 #[command(about, long_about = None)]
 struct Args {
+    /// Server Host
+    #[arg(short, long, default_value = "localhost")]
+    server_host: String,
+
     /// Server Port
     #[arg(short, long, default_value_t = 45600)]
     port: u16,
@@ -451,7 +455,6 @@ fn send(socket: &UdpSocket, response: &ResponseMarshal, addr: SocketAddr) {
 
 }
 
-const LOCALHOST: &str = "127.0.0.1";
 fn main() {
     // gracefully handle a ctrl-c event as a way to close the server
     let _ = ctrlc::set_handler(move || { 
@@ -474,7 +477,7 @@ fn main() {
     }
 
     // bind a socket for the server 
-    let server_address:&str = &(LOCALHOST.to_owned() + ":" + &args.port.to_string());
+    let server_address:&str = &(args.server_host + ":" + &args.port.to_string());
     let socket: UdpSocket = UdpSocket::bind(server_address).expect(&format!("Couldn't bind to address {server_address}"));
 
     // Print all the command line arguments for verification

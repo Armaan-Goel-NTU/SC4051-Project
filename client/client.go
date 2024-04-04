@@ -12,9 +12,9 @@ import (
 var (
     s_port int
     c_port int
-    host string
+    s_host string
+	c_host string
     t int
-	c_addr string = "127.0.0.1"
 	retries int
 	timeout int
 )
@@ -66,7 +66,8 @@ func displayMenu() uint32 {
 func main() {
 	/* Command Line Arguments in the format 
 		flag.Type(&variable, argument name, default value, description) */
-    flag.StringVar(&host, "host", "127.0.0.1", "server host")
+    flag.StringVar(&s_host, "s_host", "127.0.0.1", "server host")
+	flag.StringVar(&c_host, "c_host", "127.0.0.1", "client host")
     flag.IntVar(&s_port, "s_port", 45600, "server port")
     flag.IntVar(&c_port, "c_port", 45601, "client port")
     flag.IntVar(&t, "t", 10000, "freshness interval")
@@ -75,8 +76,8 @@ func main() {
 	flag.Parse()
 
 	// Print all the command line arguments for verification
-	fmt.Printf("%s Server address is %s:%d\n", header(ClientHeader), host, s_port)
-	fmt.Printf("%s Client address is %s:%d\n", header(ClientHeader), c_addr, c_port)
+	fmt.Printf("%s Server address is %s:%d\n", header(ClientHeader), s_host, s_port)
+	fmt.Printf("%s Client address is %s:%d\n", header(ClientHeader), c_host, c_port)
 	fmt.Printf("%s Freshness interval is %dms\n", header(ClientHeader), t)
 	fmt.Printf("%s Max retries is %d\n", header(ClientHeader), retries)
 	fmt.Printf("%s Timeout is %dms\n", header(ClientHeader), timeout)
