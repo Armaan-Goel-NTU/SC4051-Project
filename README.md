@@ -8,12 +8,14 @@ The server is written in Rust, which can be installed from https://www.rust-lang
 # Usage
 ## Client
 ```
+  -c_host string
+    	client host (default "127.0.0.1")
   -c_port int
     	client port (default 45601)
-  -host string
-    	server host (default "127.0.0.1")
   -retries int
     	number of request retries (default 3)
+  -s_host string
+    	server host (default "127.0.0.1")
   -s_port int
     	server port (default 45600)
   -t int
@@ -35,10 +37,11 @@ go build client
 Usage: server [OPTIONS]
 
 Options:
-  -p, --port <PORT>   Server Port [default: 45600]
-  -d, --dir <DIR>     Root File Directory [default: ]
-  -a, --at-most-once  At most once semantic
-  -h, --help          Print help
+  -s, --server-host <SERVER_HOST>  Server Host [default: localhost]
+  -p, --port <PORT>                Server Port [default: 45600]
+  -d, --dir <DIR>                  Root File Directory [default: ]
+  -a, --at-most-once               At most once semantic
+  -h, --help                       Print help
 ```
 
 To build & run the program
