@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // global variables (command line arguments)
@@ -27,9 +28,11 @@ var (
 		fmt.Print(prompt)
 		reader := bufio.NewReader(os.Stdin)
 		input, _ = reader.ReadString('\n')
+		// remove carriage return and newline
+		input = strings.Replace(input, "\r", "", -1)
+		input = strings.Replace(input, "\n", "", -1)
 	}
-	// -1 to remove the newline
-	return input[:len(input)-1]
+	return input
 }
 
 /* This function keeps reading a string from the console input
