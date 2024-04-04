@@ -1,5 +1,7 @@
 package main
 
+// ANSI color escape sequences
+// Need to use PowerShell if on Windows
 const (
     Reset   = "\033[0m"
     Red     = "\033[1;31m"
@@ -11,6 +13,8 @@ const (
     White   = "\033[1;37m"
 )
 
+// These header constants are global variables for easy access in all files
+// iota = 0 and is automatically incremented assigned to constants with no given value
 const (
     ClientHeader = iota
     MonitorHeader
@@ -22,6 +26,8 @@ const (
     Error  
 )
 
+// Converts a constant to a string header with the correct color and reset escape sequence
+// This helps distinguish log messages easily as the application is quite verbose
 func header(i int) string {
     switch i {
         case ClientHeader:
