@@ -41,7 +41,7 @@ func readInt(prompt string, min uint32) uint32 {
 	for err != nil { 
 		input := readString(prompt)
 		// -1 to remove the newline. 10 is the base. 32 is the bit-width of the integer
-		choice64, err = strconv.ParseUint(input[:len(input)-1], 10, 32) 
+		choice64, err = strconv.ParseUint(input, 10, 32) 
 		choice = uint32(choice64)
 		if choice < min {
 			err = fmt.Errorf("%d is less than the minimum %d",choice,min)
