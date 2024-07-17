@@ -1,6 +1,11 @@
 # SC4051-Project
 Remote File Access System for SC4051 Distributed Systems
 
+# Note
+### Based on feedback received during the demo
+T<sub>mserver</sub> was not used.
+When a cache entry expires on the client side, it asks the server for an updated copy. The server is supposed to check if the file has been modified by another client since initially serving that data to the requesting client. The server should only re-read and send the data if there were any modifications. Otherwise, it should just tell the client to extend the validity of its own cache by the freshness interval. In this implementation, the server always reads a file and sends the data whenever the client asks for it. There is no caching mechanism on the server-side, only on the client's side. 
+
 # Installation
 The client is written in Go, which can be installed from https://go.dev/doc/install \
 The server is written in Rust, which can be installed from https://www.rust-lang.org/tools/install
